@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}OpenStack - Home{% endblock %}
+
+{% block javascript %}
+{% endblock %}
+
+{% block head %}
+<div class="jumbotron">
+    <h1>Registration</h1>
+    <p>The LAL cloud infrastructure lets users and application developpers try out their softwares without having to install and manage their own cloud.</p>
+    <a href="/register">
+        <button id="register" type="button" class="btn btn-primary ">REGISTER <span class="glyphicon glyphicon-arrow-right"></span></button>
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<h2>Getting Started</h2>
+<ul>
+    <li>View <a href="https://openstack.lal.in2p3.fr/tutoriel/tutorial/" target="_blank">documentation</a> and
+        <a href="/policies">policies</a>
+    </li>
+    <li><strong>New user?</strong> <a href="/register">Register</a> for an account.</li>
+    <li><strong>Existing user?</strong> Update your <a href="/login">profile</a>.</li>
+    <!--<li>Forgot your password?  <a href="/reset">Reset it</a>!</li>-->
+</ul>
+
+<h2>Support</h2>
+
+<p>Please visit <a href="https://openstack.lal.in2p3.fr/tutoriel/tutorial/" target="_blank">the documentation page</a> or <a href="https://cloud-support.lal.in2p3.fr" target="_blank">contact us</a> </p>
+{% endblock %}

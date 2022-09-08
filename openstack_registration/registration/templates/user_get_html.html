@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}OpenStack - User{% endblock %}
+
+{% block javascript %}
+var $oldPassword = 'False';
+var $newPassword = 'False';
+
+$(document).click(function() {
+
+});
+
+$(document).ready(function() {
+    disable_change_button();
+    get_attributes();
+    show_modal();
+    $('#checkPasswords').click(function() {
+        check_actual_password();
+        check_password_constraints();
+        <!--enable_change_button();-->
+    });
+    hide_see_password();
+    $('#clearButton, #closeButton').click(function() {
+        clear_form();
+    });
+    change_password();
+});
+
+function show_modal() {
+    $('#changePassword').click(function() {
+        $('#modalPassword').modal('show');
+    });
+}
+
+function get_attributes() {
+    $.getJSON(location.pathname, { format: 'json' }).done(
+        function (json) {
+            $('#usernameInput').val(json.attrs.uid);
+            $('#emailInput').val(json.attrs.mail);
+            $('#firstnameInput').val(json.attrs.givenName);
+            $('#lastnameInput').val(json.attrs.sn);
+        }
+    );
+}
+
+function check_actual_password() {
+    $.getJSON("/attributes/?format=json", { checkPassword: $('#actualPasswordInput').val() }).done(
+        function (json) {
+            if (json.status == 'fail') {
+                document.getElementById("errorPassword").innerHTML = "This is not your actual password !";
+                $oldPassword = 'False';
+            }
+            else if (json.status == 'success') {
+                $oldPassword = 'True';
+                enable_change_button();
+            }
+        }
+    );
+}
+
+function check_password_constraints() {
+    $.getJSON( "/attributes/?format=json", { password: $('#newPasswordInput').val() }).done(
+        function(json) {
+            if ( json.check == 'character' ) {
+               document.getElementById("errorPassword").innerHTML = "Password have to contains at least 8 characters !";
+                $newPassword = 'False';
+            }
+            else if ( json.check == 'require' ) {
+                document.getElementById("errorPassword").innerHTML = "Password have to contains lowercase, uppercase, digit, special (at least 3/4) !";
+                $newPassword = 'False';
+            }
+            else if ( json.check == 'success' ) {
+                <!--document.getElementById("errorPassword").innerHTML = '';-->
+                $newPassword = 'True';
+                enable_change_button();
+            }
+        }
+    );
+
+    if ( $("#newPasswordInput").val() != $("#reNewPasswordInput").val() ) {
+            document.getElementById("errorPassword").innerHTML = "Password aren't matching !";
+    }
+    else if ( $("#newPasswordInput").val() == $('#actualPasswordInput').val() ) {
+            document.getElementById("errorPassword").innerHTML = "Old and new password are the same !";
+    }
+    else {
+        document.getElementById("errorPassword").innerHTML = '';
+    }
+}
+
+function enable_change_button() {
+    if ( ($oldPassword == 'True') && ($newPassword == 'True') && (document.getElementById("errorPassword").innerHTML == '')) {
+        $('#changeButton').removeAttr('disabled');
+    }
+    else {
+        $('#changeButton').attr('disabled', 'disabled');
+    }
+}
+
+function disable_change_button() {
+    $('#actualPasswordInput, #newPasswordInput, #reNewPasswordInput').click(function() {
+        $('#changeButton').attr('disabled', 'disabled');
+    });
+}
+
+function change_password() {
+    $('#changeButton').click(function() {
+        $.ajaxSetup({
+            beforeSend : function(xhr) {
+                xhr.setRequestHeader("X-CSRFToken", "{{ csrf_token }}" );
+            }
+        });
+        $.ajax({
+            url: '/attributes/?format=json&changePassword',
+            type: 'PUT',
+            data: { 'changePassword': $('#newPasswordInput').val() },
+            success: function(json) {
+                if (json.status == 'success') {
+                    document.getElementById("errorPassword").innerHTML = 'Password has been changed !';
+                    clear_form();
+                }
+                else {
+                    document.getElementById("errorPassword").innerHTML = 'Password have not been changed !';
+                }
+            },
+            error: function() {
+            }
+        });
+    });
+}
+
+function hide_see_password() {
+    $('#passwordIcon1').click( function() {
+        if ( $("#actualPasswordInput").attr('type') == 'password') {
+            $("#actualPasswordInput").attr('type', 'text');
+            $('#passwordIcon1').attr('title', 'Hide Password');
+            $('#passwordIcon1').attr('class', 'btn btn-primary input-group-addon glyphicon glyphicon-eye-close');
+        }
+        else {
+            $("#actualPasswordInput").attr('type', 'password');
+            $('#passwordIcon1').attr('title', 'See Password');
+            $('#passwordIcon1').attr('class', 'btn btn-primary input-group-addon glyphicon glyphicon-eye-open');
+        }
+    });
+    $('#passwordIcon2').click( function() {
+        if ( $("#newPasswordInput").attr('type') == 'password') {
+            $("#newPasswordInput").attr('type', 'text');
+            $('#passwordIcon2').attr('title', 'Hide Password');
+            $('#passwordIcon2').attr('class', 'btn btn-primary input-group-addon glyphicon glyphicon-eye-close');
+        }
+        else {
+            $("#newPasswordInput").attr('type', 'password');
+            $('#passwordIcon2').attr('title', 'See Password');
+            $('#passwordIcon2').attr('class', 'btn btn-primary input-group-addon glyphicon glyphicon-eye-open');
+        }
+    });
+    $('#passwordIcon3').click( function() {
+        if ( $("#reNewPasswordInput").attr('type') == 'password') {
+            $("#reNewPasswordInput").attr('type', 'text');
+            $('#passwordIcon3').attr('title', 'Hide Password');
+            $('#passwordIcon3').attr('class', 'btn btn-primary input-group-addon glyphicon glyphicon-eye-close');
+        }
+        else {
+            $("#reNewPasswordInput").attr('type', 'password');
+            $('#passwordIcon3').attr('title', 'See Password');
+            $('#passwordIcon3').attr('class', 'btn btn-primary input-group-addon glyphicon glyphicon-eye-open');
+        }
+    });
+}
+
+function clear_form() {
+    $("#actualPasswordInput").val('');
+    $("#newPasswordInput").val('');
+    $("#reNewPasswordInput").val('');
+    $('#changeButton').attr('disabled', 'disabled');
+    $oldPassword = 'False';
+    $newPassword = 'False';
+}
+
+{% endblock %}
+
+{% block content %}
+<div>
+    <h2>User profile</h2>
+
+    <p>
+      Here you can check your profile and change your password.
+    </p>
+
+    <form id="form">{% csrf_token %}
+        <div class="form-group col-sm-10">
+            <label id="usernameLabel" class="control-label col-sm-2">Username: </label>
+            <div id="username" class="col-sm-3">
+                <input id="usernameInput" type="text" value="" class="form-control" placeholder="Username" aria-describedby="basic-addon1" disabled>
+            </div>
+            <!--<div class="col-sm-5">-->
+                <!--<p id="errorUsername" style="color:red"></p>-->
+            <!--</div>-->
+        </div>
+        <div class="form-group col-sm-10">
+            <label id="emailLabel" class="control-label col-sm-2">Email address: </label>
+            <div id="email" class="col-sm-3">
+                <input id="emailInput" type="text" value="" class="form-control" placeholder="Email address" aria-describedby="basic-addon1" disabled>
+            </div>
+            <!--<div class="col-sm-5">-->
+                <!--<p id="errorEmail" style="color:red"></p>-->
+            <!--</div>-->
+        </div>
+        <div class="form-group col-sm-10">
+            <label id="firstnameLabel" class="control-label col-sm-2">Firstname: </label>
+            <div id="firstname" class="col-sm-3">
+                <input id="firstnameInput" type="text" value="" class="form-control" placeholder="Firstname" aria-describedby="basic-addon1" disabled>
+            </div>
+            <!--<div class="col-sm-5">-->
+                <!--<p id="errorFirstname" style="color:red"></p>-->
+            <!--</div>-->
+        </div>
+        <div class="form-group col-sm-10">
+            <label id="lastnameLabel" class="control-label col-sm-2">Lastname: </label>
+            <div id="lastname" class="col-sm-3">
+                <input id="lastnameInput" type="text" value="" class="form-control" placeholder="Lastname" aria-describedby="basic-addon1" disabled>
+            </div>
+            <!--<div class="col-sm-5">-->
+                <!--<p id="errorLastname" style="color:red"></p>-->
+            <!--</div>-->
+        </div>
+        <div class="col-sm-5">
+            <button id="changePassword" class="btn btn-primary" type="button">Change your password</button>
+        </div>
+    </form>
+</div>
+
+{% include "modal_password.html" %}
+
+{% endblock %}
+

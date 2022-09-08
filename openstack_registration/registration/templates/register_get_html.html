@@ -1,0 +1,543 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block title %}OpenStack - Register{% endblock %}
+
+{% block css %}
+
+<style>
+    .input-group-addon.input-group-addon-spec {
+        padding: 0px 0px;
+        border: 0px solid #ccc;
+    }
+
+    .popover{
+        width: 150%;
+    }
+
+</style>
+{% endblock %}
+
+{% block javascript %}
+
+$(document).ready(function() {
+    clear_form();
+});
+
+$(document).on("keyup click ready", function() {
+    check_empty_fields();
+});
+
+$(function() {
+    $('[data-toggle="popover"]').popover()
+    get_certificate_dn();
+    hide_see_password();
+
+    $.ajax({
+        url: hide_send_button_on_diff(),
+        success: function (json) {
+            check_send_button();
+        }
+    });
+
+
+    <!--hide_send_button_on_diff();-->
+    <!--$('#checkButton').click( function() {-->
+        <!--$.ajax({-->
+            <!--url: check_form(),-->
+            <!--statusCode: {-->
+                <!--200: function() {-->
+                    <!--hide_send_button();-->
+                <!--}-->
+            <!--}-->
+        <!--});-->
+    <!--});-->
+
+    $('#sendButton').click( function() {
+        add_user();
+    });
+});
+
+function check_send_button() {
+    $('#checkButton').click( function() {
+        $.ajax({
+            url: check_form(),
+            statusCode: {
+                200: function() {
+                    hide_send_button();
+                }
+            }
+        });
+    });
+}
+
+function get_certificate_dn() {
+    $('#xDNInput').val('');
+    $.ajaxSetup({
+        beforeSend : function(xhr) {
+            xhr.setRequestHeader("X-CSRFToken", "{{ csrf_token }}" );
+        }
+    });
+    $.ajax({
+        type: 'GET',
+        url: '/register?format=json&cert',
+        success: function(json){
+            if (json.DN != '') {
+               $('#xDNInput').val(json.DN);
+            }
+        }
+    });
+}
+
+function add_user() {
+    $.ajaxSetup({
+        beforeSend : function(xhr) {
+            xhr.setRequestHeader("X-CSRFToken", "{{ csrf_token }}" );
+        }
+    });
+    $.ajax({
+        <!--url: '/register?format=json&adduser&password=' + $('#passwordInput').val(),-->
+        url: '/register?format=json&adduser',
+        type: 'POST',
+        data: { 'username': $('#usernameInput').val(),
+                'email': $('#emailInput').val(),
+                'firstname': $('#firstnameInput').val(),
+                'lastname': $('#lastnameInput').val(),
+                'password': $('#passwordInput').val(),
+                'project': $('#projectInput').val(),
+                'x500dn': $('#xDNInput').val()
+        },
+        success: function() {
+            clear_form();
+            document.getElementById("errorCreation").innerHTML = "ACCOUNT CREATED";
+        },
+        error: function() {
+            document.getElementById("errorCreation").innerHTML = "ACCOUNT NOT CREATED";
+        }
+    });
+}
+
+function clear_form() {
+    $("#usernameInput").val('');
+    $("#firstnameInput").val('');
+    $("#lastnameInput").val('');
+    $("#emailInput").val('');
+    $("#xDNInput").val('');
+    $("#projectInput").val('');
+    $("#passwordInput").val('');
+    $("#checkPasswordInput").val('');
+    checkBoxInput.checked = '';
+}
+
+function hide_send_button_on_diff() {
+    $("input[id*='Input'").on('click keyup', function () {
+        $("#sendButton").attr('type', 'hidden');
+        $("#sendButton").attr('disabled');
+    });
+}
+
+function check_form() {
+    document.getElementById("errorCreation").innerHTML = '';
+    if (( $("#usernameInput").val().length < 3 ) || ( $("#usernameInput").val().length > 20 )) {
+        document.getElementById("errorUsername").innerHTML = "Username have to contains 3 to 20 characters !";
+    }
+    else {
+        isUsernameExist();
+    }
+    if ( isValidEmailAddress($("#emailInput").val()) == 0 ) {
+        document.getElementById("errorEmail").innerHTML = "Email is not valid !";
+    }
+    else {
+        isMailExist();
+    }
+    if ( $("#firstnameInput").val() == '' ) {
+        document.getElementById("errorFirstname").innerHTML = "Firstname can't be empty !";
+    }
+    else {
+        document.getElementById("errorFirstname").innerHTML = '';
+        check_characters_name();
+    }
+    if ( $("#lastnameInput").val() == '' ) {
+        document.getElementById("errorLastname").innerHTML = "Lastname can't be empty !";
+    }
+    else {
+        document.getElementById("errorLastname").innerHTML = '';
+    }
+    check_password_constraints();
+    if ( !checkBoxInput.checked ) {
+        document.getElementById("errorText").innerHTML = "You have to read and agree with Terms, Conditions and Policies !";
+    }
+    else {
+        document.getElementById("errorText").innerHTML = '';
+    }
+    if ( $("#projectInput").val() != '' ) {
+        normalize_project();
+    }
+}
+
+function isUsernameExist() {
+    $.ajaxSetup({
+        beforeSend : function(xhr) {
+            xhr.setRequestHeader("X-CSRFToken", "{{ csrf_token }}" );
+        }
+    });
+    $.ajax({
+        type: 'GET',
+        url: '/attributes/?format=json',
+        data: { 'uid': $('#usernameInput').val(),
+        },
+        success: function(json){
+            if ( json.status == 'fail' ) {
+                document.getElementById("errorUsername").innerHTML = "Username already in use !";
+            }
+            else {
+                document.getElementById("errorUsername").innerHTML = '';
+            }
+            $('#usernameInput').val(json.uid);
+            check_empty_fields();
+            if (( $("#usernameInput").val().length < 3 ) || ( $("#usernameInput").val().length > 20 )) {
+                document.getElementById("errorUsername").innerHTML = "Username have to contains 3 to 20 characters !";
+            }
+        }
+    });
+}
+
+function normalize_project() {
+    $.ajaxSetup({
+        beforeSend : function(xhr) {
+            xhr.setRequestHeader("X-CSRFToken", "{{ csrf_token }}" );
+        }
+    });
+    $.ajax({
+        type: 'GET',
+        url: '/attributes/?format=json',
+        data: { 'project': $("#projectInput").val(),
+        },
+        success: function(json){
+            $("#projectInput").val(json.project);
+        }
+    });
+}
+
+function check_characters_name() {
+    $.ajaxSetup({
+        beforeSend : function(xhr) {
+            xhr.setRequestHeader("X-CSRFToken", "{{ csrf_token }}" );
+        }
+    });
+    $.ajax({
+        type: 'GET',
+        url: '/attributes/?format=json',
+        data: { 'firstname': $('#firstnameInput').val(),
+                'lastname': $('#lastnameInput').val(),
+        },
+        success: function(json){
+            $('#firstnameInput').val(json.firstname);
+            $('#lastnameInput').val(json.lastname);
+            check_empty_fields();
+            if ( $("#firstnameInput").val() == '' ) {
+                document.getElementById("errorFirstname").innerHTML = "Firstname can't be empty !";
+            }
+            if ( $("#lastnameInput").val() == '' ) {
+                document.getElementById("errorLastname").innerHTML = "Lastname can't be empty !";
+            }
+        }
+    });
+}
+
+function isMailExist() {
+    $.ajaxSetup({
+        beforeSend : function(xhr) {
+            xhr.setRequestHeader("X-CSRFToken", "{{ csrf_token }}" );
+        }
+    });
+    $.ajax({
+        type: 'GET',
+        url: '/attributes/?format=json',
+        data: { 'mail': $('#emailInput').val(),
+        },
+        success: function(json){
+            if ( json.status == 'fail' ) {
+                document.getElementById("errorEmail").innerHTML = "Email already in use !";
+            }
+            else {
+                document.getElementById("errorEmail").innerHTML = '';
+            }
+        }
+    });
+}
+
+function hide_send_button() {
+    values = [];
+    tmp = '';
+    $.each($("p[id*='error'"), function (index, value) {
+        values.push(value.id);
+    });
+
+    $.each(values, function (index, value) {
+        tmp = tmp + document.getElementById(value).innerHTML;
+    });
+
+    if ( tmp != '' ) {
+        $("#sendButton").attr('type', 'hidden');
+        $("#sendButton").attr('disabled', '');
+    }
+    else if ( $("input[style='border-color:red;'").length > 0 ) {
+        $("#sendButton").attr('type', 'hidden');
+        $("#sendButton").attr('disabled', '');
+    }
+    else {
+        $("#sendButton").attr('type', 'button');
+        $("#sendButton").removeAttr('disabled');
+    }
+}
+
+function hide_see_password() {
+    $('#passwordIcon').click( function() {
+        if ( $("#passwordInput").attr('type') == 'password') {
+            $("#passwordInput").attr('type', 'text');
+            $('#passwordIcon').attr('title', 'Hide Password');
+            $('#passwordIcon').attr('class', 'btn btn-primary input-group-addon glyphicon glyphicon-eye-close');
+        }
+        else {
+            $("#passwordInput").attr('type', 'password');
+            $('#passwordIcon').attr('title', 'See Password');
+            $('#passwordIcon').attr('class', 'btn btn-primary input-group-addon glyphicon glyphicon-eye-open');
+        }
+    });
+
+    $('#checkPasswordIcon').click( function() {
+        if ( $("#checkPasswordInput").attr('type') == 'password') {
+            $("#checkPasswordInput").attr('type', 'text');
+            $('#checkPasswordIcon').attr('title', 'Hide Password');
+            $('#checkPasswordIcon').attr('class', 'btn btn-primary input-group-addon glyphicon glyphicon-eye-close');
+        }
+        else {
+            $("#checkPasswordInput").attr('type', 'password');
+            $('#checkPasswordIcon').attr('title', 'See Password');
+            $('#checkPasswordIcon').attr('class', 'btn btn-primary input-group-addon glyphicon glyphicon-eye-open');
+        }
+    });
+}
+
+function check_password_constraints() {
+    $.ajaxSetup({
+        beforeSend : function(xhr) {
+            xhr.setRequestHeader("X-CSRFToken", "{{ csrf_token }}" );
+        }
+    });
+    $.ajax({
+        type: 'GET',
+        url: '/attributes/?format=json',
+        data: { 'password': $('#passwordInput').val(),
+        },
+        success: function(json){
+            if ( json.check == 'character' ) {
+               document.getElementById("errorPassword").innerHTML = "Password have to contains at least 8 characters !";
+            }
+            else if ( json.check == 'require' ) {
+                document.getElementById("errorPassword").innerHTML = "Password have to contains lowercase, uppercase, digit, special (at least 3/4) !";
+            }
+            else if ( json.check == 'success' ) {
+                document.getElementById("errorPassword").innerHTML = '';
+            }
+            else {
+                document.getElementById("errorPassword").innerHTML = "Error";
+            }
+        }
+    });
+
+    if ( $("#passwordInput").val() != $("#checkPasswordInput").val() ) {
+            document.getElementById("errorCheckPassword").innerHTML = "Password aren't matching !";
+    }
+    else {
+        document.getElementById("errorCheckPassword").innerHTML = '';
+    }
+}
+
+function check_empty_fields() {
+    if ( $("#usernameInput").val() != '') {
+        $("#usernameInput").attr('style', 'border-color:;')
+    }
+    else {
+        $("#usernameInput").attr('style', 'border-color:red;')
+    }
+
+    if ( $("#emailInput").val() != '') {
+        $("#emailInput").attr('style', 'border-color:;')
+    }
+    else {
+        $("#emailInput").attr('style', 'border-color:red;')
+    }
+
+    if ( $("#firstnameInput").val() != '') {
+        $("#firstnameInput").attr('style', 'border-color:;')
+    }
+    else {
+        $("#firstnameInput").attr('style', 'border-color:red;')
+    }
+
+    if ( $("#lastnameInput").val() != '') {
+        $("#lastnameInput").attr('style', 'border-color:;')
+    }
+    else {
+        $("#lastnameInput").attr('style', 'border-color:red;')
+    }
+
+    if ( $("#passwordInput").val() != '') {
+        $("#passwordInput").attr('style', 'border-color:;')
+    }
+    else {
+        $("#passwordInput").attr('style', 'border-color:red;')
+    }
+
+    if ( $("#checkPasswordInput").val() != '') {
+        $("#checkPasswordInput").attr('style', 'border-color:;')
+    }
+    else {
+        $("#checkPasswordInput").attr('style', 'border-color:red;')
+    }
+}
+
+function isValidEmailAddress(emailAddress) {
+    var pattern = /^([a-z\d!#$%&'*+\-\/=?^_`{|}~\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]+(\.[a-z\d!#$%&'*+\-\/=?^_`{|}~\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]+)*|"((([ \t]*\r\n)?[ \t]+)?([\x01-\x08\x0b\x0c\x0e-\x1f\x7f\x21\x23-\x5b\x5d-\x7e\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]|\\[\x01-\x09\x0b\x0c\x0d-\x7f\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]))*(([ \t]*\r\n)?[ \t]+)?")@(([a-z\d\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]|[a-z\d\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF][a-z\d\-._~\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]*[a-z\d\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])\.)+([a-z\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]|[a-z\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF][a-z\d\-._~\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]*[a-z\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])\.?$/i;
+    return pattern.test(emailAddress);
+}
+
+{% endblock %}
+
+{% block content %}
+<div>
+    <h2>Registration form</h2>
+
+    <p>
+      Please complete the following form to create a new account
+      on the LAL cloud infrastructures.
+    </p>
+    <p>
+      <strong>Fields in red are mandatory.</strong>
+    </p>
+
+    <!--<form id="form" action="register" enctype="application/x-www-form-urlencoded" method="POST">{% csrf_token %}-->
+    <form id="form">{% csrf_token %}
+        <div class="form-group col-sm-10">
+            <label id="usernameLabel" class="control-label col-sm-2">Username: </label>
+            <div id="username" class="col-sm-3">
+                <input style="border-color:red;" id="usernameInput" type="text" value="" class="form-control" placeholder="Username" aria-describedby="basic-addon1">
+            </div>
+            <div class="col-sm-5">
+                <p id="errorUsername" style="color:red"></p>
+            </div>
+        </div>
+        <div class="form-group col-sm-10">
+            <label id="emailLabel" class="control-label col-sm-2">Email address: </label>
+            <div id="email" class="col-sm-3">
+                <input style="border-color:red;" id="emailInput" type="text" value="" class="form-control" placeholder="Email address" aria-describedby="basic-addon1">
+            </div>
+            <div class="col-sm-5">
+                <p id="errorEmail" style="color:red"></p>
+            </div>
+        </div>
+        <div class="form-group col-sm-10">
+            <label id="firstnameLabel" class="control-label col-sm-2">Firstname: </label>
+            <div id="firstname" class="col-sm-3">
+                <input style="border-color:red;" id="firstnameInput" type="text" value="" class="form-control" placeholder="Firstname" aria-describedby="basic-addon1">
+            </div>
+            <div class="col-sm-5">
+                <p id="errorFirstname" style="color:red"></p>
+            </div>
+        </div>
+        <div class="form-group col-sm-10">
+            <label id="lastnameLabel" class="control-label col-sm-2">Lastname: </label>
+            <div id="lastname" class="col-sm-3">
+                <input style="border-color:red;" id="lastnameInput" type="text" value="" class="form-control" placeholder="Lastname" aria-describedby="basic-addon1">
+            </div>
+            <div class="col-sm-5">
+                <p id="errorLastname" style="color:red"></p>
+            </div>
+        </div>
+        <div class="form-group col-sm-10">
+            <label id="xDNLabel" class="control-label col-sm-2">X500 DN (optional): </label>
+            <div id="xDN" class="col-sm-3">
+                <div class="input-group">
+                    <input id="xDNInput" type="text" value="" class="form-control" placeholder="X500 DN" aria-describedby="basic-addon1">
+                    <span class="input-group-addon input-group-addon-spec"><button type="button" id="dnIcon" title="Cert field info" data-toggle="popover" data-trigger="focus" data-placement="right" data-content="Your X500 DN Certificate have to be exact. You can add your certificate on your browser and this page will detect it automatically (if not look at your settings)." class="btn glyphicon glyphicon-info-sign"></button></span>
+                </div>
+            </div>
+            <div class="col-sm-5">
+                <p id="errorXDN" style="color:red"></p>
+            </div>
+        </div>
+        <div class="form-group col-sm-10">
+            <label id="projectLabel" class="control-label col-sm-2">Project (optional): </label>
+            <div id="project" class="col-sm-3">
+                <div class="input-group">
+                    <input id="projectInput" type="text" value="" class="form-control" placeholder="Project wished" aria-describedby="basic-addon1">
+                    <span class="input-group-addon input-group-addon-spec"><button type="button" id="projectIcon" title="Project field info" data-toggle="popover" data-trigger="focus" data-placement="right" data-content="You can put a name of a project if you know it (must be a name with letter and digit only; no accent no special character...)" class="btn glyphicon glyphicon-info-sign"></button></span>
+                </div>
+            </div>
+            <div class="col-sm-5">
+                <p id="errorProject" style="color:red"></p>
+            </div>
+        </div>
+        <div class="form-group col-sm-10">
+            <label id="passwordLabel" class="control-label col-sm-2">Password *: </label>
+            <div id="password" class="col-sm-3">
+                <div class="input-group">
+                    <input style="border-color:red;" id="passwordInput" type="password" value="" class="form-control" placeholder="Password" aria-describedby="basic-addon1">
+                    <span id="passwordIcon" title="See password" class="btn btn-primary input-group-addon glyphicon glyphicon-eye-open"></span>
+                </div>
+            </div>
+            <div class="col-sm-5">
+                <p id="errorPassword" style="color:red"></p>
+            </div>
+        </div>
+        <div class="form-group col-sm-10">
+            <label id="checkPasswordLabel" class="control-label col-sm-2">Retype password *: </label>
+            <div id="checkPassword" class="col-sm-3">
+                <div class="input-group">
+                    <input style="border-color:red;" id="checkPasswordInput" type="password" value="" class="form-control" placeholder="Retype your password" aria-describedby="basic-addon1">
+                    <span id="checkPasswordIcon" title="See password" class="btn btn-primary input-group-addon glyphicon glyphicon-eye-open"></span>
+                </div>
+            </div>
+            <div class="col-sm-5">
+                <p id="errorCheckPassword" style="color:red"></p>
+            </div>
+        </div>
+        <!--<div class="form-group col-sm-10">-->
+            <!--<label id="messageLabel" class="control-label col-sm-2">Message: </label>-->
+            <!--<div id="message" class="col-sm-3">-->
+                <!--<textarea cols="40" rows="5"></textarea>-->
+            <!--</div>-->
+            <!--<div class="col-sm-5"></div>-->
+        <!--</div>-->
+        <div class="form-group col-sm-10">
+            <label id="agreementLabel" class="control-label col-sm-6" style="font-size: 17px;">I have read and agree to the <a href="/policies" target="_blank"><u>Terms, Conditions & Policies</u></a></label>
+            <div id="agreement" class="col-sm-1">
+                <input id="checkBoxInput" type="checkbox" name="agreement" style="">
+            </div>
+            <div class="col-sm-5"></div>
+        </div>
+        <div class="col-sm-10">
+            <!--<p><i>* 3 to 20 characters characters</i></p>-->
+            <!--<p><i>** At least 8 characters</i></p>-->
+            <p id="errorText" style="color:red"></p>
+            <div class="col-sm-5"></div>
+        </div>
+        <div class="col-sm-10">
+            <input class="btn btn-primary col-sm-2" id="checkButton" value="Check Form" type="button">
+            <div class="col-sm-3"></div>
+            <input class="btn btn-primary col-sm-1" type="hidden" id="sendButton" value="Send" disabled="">
+            <div class="col-sm-1"></div>
+            <div class="col-sm-3">
+                <p id="errorCreation" style="color:red"></p>
+            </div>
+        </div>
+        <div class="col-sm-10">
+            </br>
+        </div>
+        <div class="col-sm-10">
+            <label id="infoPasswordLabel" class="control-label col-sm-6" style="font-style: italic;">* Password have to contains at least 8 characters and lowercase, uppercase, digit, special (at least 3/4) !</label>
+        </div>
+    </form>
+</div>
+{% endblock %}

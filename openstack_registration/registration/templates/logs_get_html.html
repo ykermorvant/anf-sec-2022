@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}Logs{% endblock %}
+
+{% block javascript %}
+
+var version = 'actions';
+var filter = '';
+
+function load_logs(version, filter) {
+    $.getJSON( "/logs?version="+version+"&filter="+filter).done(
+        function(json) {
+            document.getElementById("display").innerHTML = json.logs;
+        }
+    );
+}
+
+$body = $("body");
+$(document).on({
+    ajaxStart: function() {
+        $body.addClass("loading");
+    },
+    ajaxStop: function() {
+        $body.removeClass("loading");
+    }
+});
+
+$(function() {
+    $("#actions").click(function() {
+        version = 'actions';
+        load_logs(version, filter);
+    });
+
+    $("#full").click(function() {
+        version = 'full';
+        load_logs(version, filter);
+    });
+
+    load_logs(version, filter);
+
+    $("#searchInput").keypress(function(e) {
+        if (e.which == '13') {
+            $("#searchButton").click();
+        }
+    });
+
+    $("#searchButton").click(function() {
+        filter = $("#searchInput").val();
+        load_logs(version, filter);
+    });
+});
+
+
+{% endblock %}
+{% block content %}
+
+<div class="col-sm-12">
+    <div class="col-sm-12">
+        <div class="col-sm-4">
+            <div class="col-sm-10 input-group">
+                <input id="searchInput" type="text" value="" class="form-control" />
+                <span id="searchButton" class="input-group-addon btn-primary" role="button">
+                        <span class="glyphicon glyphicon-search"></span>
+                </span>
+            </div>
+        </div>
+        <div align="right">
+            <span role="button" id="actions" class="label label-primary">Actions</span>
+            <span role="button" id="full" class="label label-primary">Full</span>
+        </div>
+    </div>
+    <div>
+        <br />
+        <br />
+    </div>
+    <pre id="display">
+    </pre>
+</div>
+
+<div class="modal" id="loader">
+    <i id="icon" class="fa fa-spinner fa-pulse"></i>
+</div>
+{% endblock %}

@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}OpenStack - Manage Group{% endblock %}
+
+{% block javascript %}
+
+var users = [];
+var users_attributes = [''];
+var admin = [];
+
+$(document).ready(function() {
+    get_group();
+    getDataListUsers()
+    $('#addingButton').click(function() {
+        addUserFromGroup( $('#searchInput').val(), 'add');
+    });
+    $('#searchInput').keypress( function() {
+        document.getElementById('errorAddingUser').innerHTML = '';
+    });
+    $('#addUserButton').click(function() {
+        $('#searchInput').val('');
+        document.getElementById('errorAddingUser').innerHTML = "";
+    });
+
+});
+
+function sortOnKeys(dict) {
+    var sorted = [];
+    for(var key in dict) {
+        sorted[sorted.length] = key;
+    }
+    sorted.sort(function (a, b) {
+        return a.toLowerCase().localeCompare(b.toLowerCase());
+    });
+
+    var tempDict = {};
+    for(var i = 0; i < sorted.length; i++) {
+        tempDict[sorted[i]] = dict[sorted[i]];
+    }
+
+    return tempDict;
+}
+
+function get_group() {
+    var groupname = location.pathname.split('/')[2]
+    $("#table_id").DataTable( {
+        ajax: {
+            url: location.pathname + "?format=json",
+            dataSrc: function (json) {
+                <!--console.log(json.members);-->
+                $('#nameInput').val(json.attrs.cn);
+                $('#descriptionInput').val(json.attrs.description);
+                $.each(json.members, function (index, value) {
+                    value.icon = '<a style="color:red;" href=\''+"javascript:removeUserFromGroup(\""+value["uid"]+"\", \"remove\");'><span class='glyphicon glyphicon-remove'></span></a>";
+                    value.status = '<a style="color:green;" href=\''+"javascript:modifyGroupAdmin(\""+value["uid"]+"\", \""+groupname+"\" ,\"add\");'><span class='glyphicon glyphicon-plus'></span></a>";
+                    <!--console.log(jQuery.type(value.uid));-->
+                    <!--console.log(json.admin);-->
+                    <!--$.each(json.admin, function(index, values) {-->
+                        <!--if (value.uid == values) {-->
+                        if ($.inArray(value.uid, json.admin) !== -1) {
+                            <!--console.log(json.admin);-->
+                            <!--console.log(value.uid);-->
+                            <!--console.log("True");-->
+                            <!--console.log(values);-->
+                            value.admin = '<span class="glyphicon glyphicon-ok" style="color: green;"></span>';
+                            value.status = '<a style="color:red;" href=\''+"javascript:modifyGroupAdmin(\""+value["uid"]+"\", \""+groupname+"\" ,\"remove\");'><span class='glyphicon glyphicon-minus'></span></a>";
+                        }
+                        <!--else {-->
+                            <!--value.admin = '<span class="glyphicon glyphicon-arrow-up" style="color: green;"></span>';-->
+                            <!--value.admin = '<a style="color:green;" href=\''+"javascript:modifyGroupAdmin(\""+value["uid"]+"\", \""+groupname+"\" ,\"add\");'><span class='glyphicon glyphicon-arrow-up'></span></a>";-->
+                        <!--}-->
+                        <!--console.log(jQuery.type(value));-->
+                        <!--console.log(value);-->
+                    <!--});-->
+
+                    <!--if (!($.inArray(value.uid, json.admin))) {-->
+                        <!--if (value.uid == values) {-->
+                        <!--value.admin = '<a style="color:green;" href=\''+"javascript:modifyGroupAdmin(\""+value["uid"]+"\", \""+groupname+"\" ,\"add\");'><span class='glyphicon glyphicon-arrow-up'></span></a>";-->
+                        <!--}-->
+                        <!--else {-->
+                            <!--value.admin = '<span class="glyphicon glyphicon-arrow-up" style="color: green;"></span>';-->
+                            <!--value.admin = '<a style="color:green;" href=\''+"javascript:modifyGroupAdmin(\""+value["uid"]+"\", \""+groupname+"\" ,\"add\");'><span class='glyphicon glyphicon-arrow-up'></span></a>";-->
+                        <!--}-->
+
+
+                        <!--console.log(json.admin);-->
+                        <!--console.log(value.uid);-->
+                        <!--value.admin = '<span class="glyphicon glyphicon-ok" style="color: green;"></span>';-->
+                    <!--}-->
+                    <!--console.log(json.uid);-->
+                    <!--console.log(json.admin[0]);-->
+                });
+
+                return json.members;
+            }
+        },
+        columns: [
+            { data: 'icon'},
+            { data: 'uid'},
+            { data: 'mail'},
+            { data: 'admin'},
+            { data: 'status'},
+        ],
+        order: [[ 0, 'desc' ]],
+        iDisplayLength: 10,
+        drawCallback: function (settings) {
+            colorLine();
+        },
+        lengthMenu: [ [5, 10, 25, 50, -1], [5, 10, 25, 50, "ALL"] ],
+    });
+}
+
+function colorLine () {
+    var numberOfRows;
+    var eachRow;
+    eachRow = document.getElementById('users_table').rows
+    numberOfRows = eachRow.length;
+    for (var i = 0; i < numberOfRows; i++) {
+        if (eachRow[i].className == 'odd') {
+            eachRow[i].setAttribute('style', 'background: #f3f3f3');
+        }
+        else {
+            eachRow[i].removeAttribute('style');
+        }
+    }
+}
+
+function removeUserFromGroup(user, action) {
+    $.ajaxSetup({
+        beforeSend : function(xhr) {
+            xhr.setRequestHeader("X-CSRFToken", "{{ csrf_token }}" );
+        }
+    });
+    $.ajax({
+        url: location.pathname,
+        type: 'DEL',
+        data: { 'format': 'json',
+                'user': user,
+                'action': action
+        },
+        success: function(json) {
+            if (json.status == 'itself') {
+                $('#errorMessage').text("You can not delete yourself !");
+                $('#alert').modal('show');
+            }
+            else {
+                $("#table_id").DataTable().ajax.reload();
+            }
+        }
+    });
+}
+
+function addUserFromGroup(user, action) {
+    $.ajaxSetup({
+        beforeSend : function(xhr) {
+            xhr.setRequestHeader("X-CSRFToken", "{{ csrf_token }}" );
+        }
+    });
+    $.ajax({
+        url: location.pathname,
+        type: 'PUT',
+        data: { 'format': 'json',
+                'user': user,
+                'action': action
+        },
+        success: function(json) {
+            if (json.status == "not exist") {
+                document.getElementById('errorAddingUser').innerHTML = "This user does not exist !";
+            }
+            else if (json.status == "already") {
+                document.getElementById('errorAddingUser').innerHTML = "This user is already member of this group !";
+            }
+            else {
+                document.getElementById('errorAddingUser').innerHTML = "User '" + user + "' has been added to the group !";
+                $('#searchInput').val('');
+            }
+            $("#table_id").DataTable().ajax.reload();
+        }
+    });
+}
+
+function getDataListUsers() {
+    var datas = [];
+    var liste = $("#inputDataList");
+    <!--var liste = $("#datalistID");-->
+    liste.find('option').remove().end();
+    $.getJSON(location.pathname + "?format=json&email=bar").done(
+        function(json) {
+            datas = sortOnKeys(json.users);
+             $.each(datas, function(index, value) {
+                liste.append('<option value="' + index + '">'+value+'</option>>');
+                liste.append('<option value="' + index + '">'+index+'</option>>');
+            });
+        }
+    );
+}
+
+function modifyGroupAdmin(user, group, action) {
+    $.ajaxSetup({
+        beforeSend : function(xhr) {
+            xhr.setRequestHeader("X-CSRFToken", "{{ csrf_token }}" );
+        }
+    });
+    $.ajax({
+        url: '/groupAdmin/',
+        type: 'PUT',
+        data: { 'format': 'json',
+                'user': user,
+                'group' : group,
+                'action': action
+        },
+        success: function(json) {
+            if (json.status == 'itself') {
+                $('#errorMessage').text("You can not delete yourself !");
+                $('#alert').modal('show');
+            }
+            else {
+                $("#table_id").DataTable().ajax.reload();
+            }
+        }
+    });
+}
+
+function getAdminGroup() {
+    $.ajax({
+        url: location.pathname,
+        type: 'GET',
+        data: { 'format': 'json',
+                'admin': ''
+        },
+        success: function(json) {
+            admin = json.admin;
+        }
+    });
+}
+
+{% endblock %}
+
+{% block content %}
+<div class="col-sm-12">
+	<div class="panel panel-default" style="height: 200px;">
+		<div class="panel-heading">
+            <h1 class="panel-title" align="center"><b>About the group</b></h1>
+        </div>
+		<div class="panel-body">
+            <form class="form-horizontal">
+				<div class="form-group">
+                    <label class="control-label col-sm-3">Name : </label>
+                    <div class="col-sm-7">
+                        <input id="nameInput" type="text" class="form-control" placeholder="Group name" aria-describedby="basic-addon1" disabled>
+                    </div>
+                </div>
+				<div class="form-group">
+                    <label class="control-label col-sm-3">Description : </label>
+                    <div class="col-sm-7">
+                        <input id="descriptionInput" type="text" class="form-control" placeholder="Description" aria-describedby="basic-addon1" disabled>
+                    </div>
+                </div>
+				<!--<div class="form-group">-->
+                    <!--<label class="control-label col-sm-3">CN : </label>-->
+                    <!--<div class="col-sm-7">-->
+                        <!--<input id="cnInput" type="text" class="form-control" placeholder="CN" aria-describedby="basic-addon1" disabled>-->
+                    <!--</div>-->
+                <!--</div>-->
+				<!--<div class="form-group">-->
+                    <!--<label class="control-label col-sm-3">OU : </label>-->
+                    <!--<div class="col-sm-7">-->
+                        <!--<input id="ouInput" type="text" class="form-control" placeholder="OU" aria-describedby="basic-addon1" disabled>-->
+                    <!--</div>-->
+                <!--</div>-->
+			</form>
+		</div>
+	</div><br />
+    <div style="text-align:center;">
+        <a href="#addUserFromGroup" id="addUserButton" type="button" class="btn btn-primary" data-toggle="modal" role="button">Add user</a>
+    </div><br />
+    <div id="addUserFromGroup" class="modal in" tabindex="-1" role="dialog" style="text-align:center;" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                    <h4 class="modal-title" id="myModalLabel">Add an user to this group</h4>
+                </div>
+                <div class="modal-body">
+                    <div style="text-align:left;">
+                        <p><strong>You can search by username or email</strong></p>
+                    </div>
+                    <div class="form-group input-group col-sm-12">
+                        <label class="control-label col-sm-2" style="line-height: 200%;">Search : </label>
+                        <div class="col-sm-10">
+                            <input id="searchInput" list="inputDataList" type="text" value="" class="form-control" />
+                            <datalist id="inputDataList">
+                                <option selected>
+                            </datalist>
+                            <!--<span id="searchButton" class="input-group-addon" style="padding: 0px 0px; border: 0px;">-->
+                                <!--<span class="glyphicon glyphicon-search btn btn-primary"></span>-->
+                            <!--</span>-->
+                        </div>
+                    </div>
+                    <p id="errorAddingUser" style="color: red;"></p>
+                </div>
+                <div class="modal-footer" id="foot">
+                    <button id="addingButton" type="button" class="btn btn-primary">Add</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-12 panel panel-default">
+        <div class="panel-heading">
+            <h1 class="panel-title" align="center"><b>Members</b><br/>
+                Login & email</h1>
+        </div>
+        <div class="panel-body">
+            <div class="col-sm-1">
+
+            </div>
+            <div class="row col-sm-10">
+                <table id="table_id" class="display" width="100%">
+                    <thead>
+                        <tr>
+                            <th>
+
+                            </th>
+                            <th>
+                                User
+                            </th>
+                            <th>
+                                Email
+                            </th>
+                            <th>
+                                Admin
+                            </th>
+                            <th>
+                                Add/Del
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="users_table">
+                    </tbody>
+                </table>
+            </div>
+		</div>
+    </div>
+</div>
+<div id="alert" class="modal in" tabindex="-1" role="dialog" style="text-align:center;" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                <h4 class="modal-title" style="color: red;">ERROR</h4>
+            </div>
+            <div class="modal-body">
+                <div style="text-align:center;">
+                    <p id="errorMessage" style="color: red;"><strong></strong></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}OpenStack - Manage Groups{% endblock %}
+
+{% block javascript %}
+$(document).ready(function() {
+    get_groups();
+});
+
+function get_groups() {
+    $.getJSON(location.pathname, { format: 'json' }).done(
+        function (json) {
+            $.each( json.groups, function( index, value ) {
+                $('#group').append('<li><a href="/groupAdmin/' + value + '">' + value + '</a></li>');
+            });
+        }
+    );
+}
+{% endblock %}
+{% block content %}
+<div>
+    <h2>Groups you can manage</h2>
+    </br>
+    <p><strong>
+        Here you can click on groups which you are an administrator to manage users on it.
+    </strong></p>
+<ul id="group"></ul>
+</div>
+{% endblock %}
